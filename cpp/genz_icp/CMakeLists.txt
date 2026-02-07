@@ -51,3 +51,5 @@ include(cmake/CompilerOptions.cmake)
 add_subdirectory(core)
 add_subdirectory(metrics)
 add_subdirectory(pipeline)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../python/genz_icp/pybind
+                 ${CMAKE_CURRENT_BINARY_DIR}/pybind)
