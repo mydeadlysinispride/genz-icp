@@ -1,0 +1,87 @@
+[build-system]
+requires = ["scikit_build_core", "pybind11"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "genz_icp"
+version = "0.3.0"
+description = "GenZ-ICP: LiDAR odometry with Geometric CNN cues"
+readme = "../README.md"
+authors = [
+    { name = "Daehan Lee" },
+    { name = "Hyungtae Lim" },
+    { name = "Soohee Han" },
+]
+requires-python = ">=3.8"
+keywords = [
+    "LiDAR",
+    "Localization",
+    "Odometry",
+    "SLAM",
+]
+classifiers = [
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Intended Audience :: Other Audience",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: Unix",
+    "Programming Language :: C++",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = []
+
+[project.optional-dependencies]
+all = []
+test = [
+    "pytest",
+]
+visualizer = []
+
+[project.urls]
+Homepage = "https://github.com/cocel-postech/genz-icp"
+
+[tool.scikit-build]
+build-dir = "build/{wheel_tag}"
+cmake.source-dir = "../cpp/genz_icp"
+cmake.verbose = false
+cmake.minimum-version = "3.16"
+editable.mode = "redirect"
+editable.rebuild = true
+editable.verbose = true
+sdist.exclude = ["pybind/"]
+wheel.install-dir = "genz_icp/pybind/"
+
+[tool.black]
+line-length = 100
+
+[tool.isort]
+profile = "black"
+
+[tool.pylint.format]
+max-line-length = "100"
+
+[tool.cibuildwheel]
+archs = ["auto64"]
+skip = ["*-musllinux*", "pp*", "cp36-*"]
+
+[tool.cibuildwheel.macos]
+environment = "MACOSX_DEPLOYMENT_TARGET=11.0"
+archs = ["auto64", "arm64"]
+
+[tool.pytest.ini_options]
+testpaths = ['tests']
+
+[tool.setuptools]
+license-files = ["../LICENSE"]
+
+[tool.setuptools.packages.find]
+where = ["."]

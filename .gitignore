@@ -133,5 +133,10 @@ local.properties
 # Pybinding
 python/build/
 *.pyc
+*.egg-info/
+.eggs/
+.scikit-build/
+build/
+dist/
 
 # End of https://www.gitignore.io/api/c++,code,cmake,eclipse
