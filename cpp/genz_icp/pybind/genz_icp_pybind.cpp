@@ -1,0 +1,101 @@
+#include <pybind11/eigen.h>
+#include <pybind11/numpy.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/stl_bind.h>
+
+#include <Eigen/Core>
+#include <algorithm>
+#include <cmath>
+#include <memory>
+#include <vector>
+
+#include <sophus/se3.hpp>
+
+#include "genz_icp/core/Preprocessing.hpp"
+#include "genz_icp/core/Registration.hpp"
+#include "genz_icp/core/Threshold.hpp"
+#include "genz_icp/core/VoxelHashMap.hpp"
+#include "genz_icp/metrics/Metrics.hpp"
+#include "stl_vector_eigen.h"
+
+namespace py = pybind11;
+using namespace py::literals;
+
+PYBIND11_MAKE_OPAQUE(std::vector<Eigen::Vector3d>);
+
+namespace genz_icp {
+PYBIND11_MODULE(genz_icp_pybind, m) {
+    auto vector3dvector = pybind_eigen_vector_of_vector<Eigen::Vector3d>(
+        m, "_Vector3dVector", "std::vector<Eigen::Vector3d>",
+        py::py_array_to_vectors_double<Eigen::Vector3d>);
+
+    // Map representation
+    py::class_<VoxelHashMap> internal_map(m, "_VoxelHashMap", "Don't use this");
+    internal_map
+        .def(py::init<double, double, double, double, int>(), "voxel_size"_a, "max_distance"_a,
+             "map_cleanup_radius"_a, "planarity_threshold"_a, "max_points_per_voxel"_a)
+        .def("_clear", &VoxelHashMap::Clear)
+        .def("_empty", &VoxelHashMap::Empty)
+        .def("_update",
+             py::overload_cast<const std::vector<Eigen::Vector3d> &, const Eigen::Vector3d &>(
+                 &VoxelHashMap::Update),
+             "points"_a, "origin"_a)
+        .def(
+            "_update",
+            [](VoxelHashMap &self, const std::vector<Eigen::Vector3d> &points,
+               const Eigen::Matrix4d &T) {
+                Sophus::SE3d pose(T);
+                self.Update(points, pose);
+            },
+            "points"_a, "pose"_a)
+        .def("_add_points", &VoxelHashMap::AddPoints, "points"_a)
+        .def("_remove_far_away_points", &VoxelHashMap::RemovePointsFarFromLocation, "origin"_a)
+        .def("_point_cloud", &VoxelHashMap::Pointcloud);
+
+    // Point Cloud registration
+    py::class_<Registration> internal_registration(m, "_Registration", "Don't use this");
+    internal_registration
+        .def(py::init<int, double>(), "max_num_iterations"_a, "convergence_criterion"_a)
+        .def(
+            "_align_points_to_map",
+            [](Registration &self, const std::vector<Eigen::Vector3d> &points,
+               const VoxelHashMap &voxel_map, const Eigen::Matrix4d &T_guess,
+               double max_correspondence_distance, double kernel) {
+                Sophus::SE3d initial_guess(T_guess);
+                const auto [pose, planar_points, non_planar_points] = self.RegisterFrame(
+                    points, voxel_map, initial_guess, max_correspondence_distance, kernel);
+                return std::make_tuple(pose.matrix(), planar_points, non_planar_points);
+            },
+            "points"_a, "voxel_map"_a, "initial_guess"_a, "max_correspondance_distance"_a,
+            "kernel"_a);
+
+    // AdaptiveThreshold bindings
+    py::class_<AdaptiveThreshold> adaptive_threshold(m, "_AdaptiveThreshold", "Don't use this");
+    adaptive_threshold
+        .def(py::init<double, double, double>(), "initial_threshold"_a, "min_motion_th"_a,
+             "max_range"_a)
+        .def("_compute_threshold", &AdaptiveThreshold::ComputeThreshold)
+        .def(
+            "_update_model_deviation",
+            [](AdaptiveThreshold &self, const Eigen::Matrix4d &T) {
+                Sophus::SE3d model_deviation(T);
+                self.UpdateModelDeviation(model_deviation);
+            },
+            "model_deviation"_a);
+
+    // preprocessing modules
+    m.def("_preprocess", &Preprocess, "frame"_a, "max_range"_a, "min_range"_a);
+    m.def("_voxel_down_sample", &VoxelDownsample, "frame"_a, "voxel_size"_a);
+    /// This function only applies for the KITTI dataset, and should NOT be used by any other
+    /// dataset, the original idea and part of the implementation is taking from CT-ICP(Although
+    /// IMLS-SLAM Originally introduced the calibration factor)
+    m.def("_correct_kitti_scan", &CorrectKITTIScan, "frame"_a);
+
+    // Metrics
+    m.def("_kitti_seq_error", &metrics::SeqError, "gt_poses"_a, "results_poses"_a);
+    m.def("_absolute_trajectory_error", &metrics::AbsoluteTrajectoryError, "gt_poses"_a,
+          "results_poses"_a);
+}
+
+}  // namespace genz_icp
